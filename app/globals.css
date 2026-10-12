@@ -1,0 +1,48 @@
+@import url("https://fonts.googleapis.com/css2?family=Roboto:wght@100;300;400;500;700;900&display=swap");
+@import "tailwindcss";
+
+:root {
+  --background: #ffffff;
+  --foreground: #171717;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html,
+body {
+  margin: 0;
+  font-family: "Roboto", sans-serif;
+  background: var(--background);
+  color: var(--foreground);
+}
+
+@layer base {
+  button,
+  input,
+  textarea,
+  select {
+    font: inherit;
+  }
+}
+
+.benefit-text {
+  animation: benefit-green 12s infinite;
+}
+
+@keyframes benefit-green {
+  0% {
+    color: #032b41;
+  }
+
+  1%,
+  16.66% {
+    color: #2bd97c;
+  }
+
+  16.67%,
+  100% {
+    color: #032b41;
+  }
+}
