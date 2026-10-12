@@ -1,4 +1,4 @@
-import { applicationDefault, getApps, initializeApp } from 'firebase-admin/app';
+import { applicationDefault, cert, getApps, initializeApp } from 'firebase-admin/app';
 import { getAuth } from 'firebase-admin/auth';
 import Stripe from 'stripe';
 
@@ -11,8 +11,11 @@ function getFirebaseAdminApp() {
     throw new Error('NEXT_PUBLIC_FIREBASE_PROJECT_ID is not configured.');
   }
 
+  // Hosted environments provide the service account as JSON; local dev uses default credentials.
+  const serviceAccountJson = process.env.FIREBASE_SERVICE_ACCOUNT_KEY;
+
   return initializeApp({
-    credential: applicationDefault(),
+    credential: serviceAccountJson ? cert(JSON.parse(serviceAccountJson)) : applicationDefault(),
     projectId,
   });
 }
