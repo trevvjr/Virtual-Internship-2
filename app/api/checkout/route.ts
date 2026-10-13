@@ -1,23 +1,27 @@
-import { applicationDefault, cert, getApps, initializeApp } from 'firebase-admin/app';
-import { getAuth } from 'firebase-admin/auth';
+import { createRemoteJWKSet, errors, jwtVerify } from 'jose';
 import Stripe from 'stripe';
 
-function getFirebaseAdminApp() {
-  const existingApp = getApps()[0];
-  if (existingApp) return existingApp;
+// Firebase ID tokens are signed with Google's public keys, so no service account is needed to verify them.
+const firebaseKeys = createRemoteJWKSet(
+  new URL('https://www.googleapis.com/service_accounts/v1/jwk/securetoken@system.gserviceaccount.com'),
+);
 
+async function verifyFirebaseToken(token: string) {
   const projectId = process.env.NEXT_PUBLIC_FIREBASE_PROJECT_ID;
   if (!projectId) {
     throw new Error('NEXT_PUBLIC_FIREBASE_PROJECT_ID is not configured.');
   }
 
-  // Hosted environments provide the service account as JSON; local dev uses default credentials.
-  const serviceAccountJson = process.env.FIREBASE_SERVICE_ACCOUNT_KEY;
-
-  return initializeApp({
-    credential: serviceAccountJson ? cert(JSON.parse(serviceAccountJson)) : applicationDefault(),
-    projectId,
+  const { payload } = await jwtVerify(token, firebaseKeys, {
+    issuer: `https://securetoken.google.com/${projectId}`,
+    audience: projectId,
+    algorithms: ['RS256'],
   });
+
+  if (!payload.sub) {
+    throw new errors.JWTInvalid('Token has no subject.');
+  }
+  return payload.sub;
 }
 
 export async function POST(request: Request) {
@@ -29,16 +33,16 @@ export async function POST(request: Request) {
 
   let userId: string;
   try {
-    const decodedToken = await getAuth(getFirebaseAdminApp()).verifyIdToken(token);
-    userId = decodedToken.uid;
+    userId = await verifyFirebaseToken(token);
   } catch (error) {
     console.error('Checkout Firebase token verification failed:', error);
     if (
-      typeof error === 'object' &&
-      error !== null &&
-      'code' in error &&
-      typeof error.code === 'string' &&
-      error.code.startsWith('auth/')
+      error instanceof errors.JWTClaimValidationFailed ||
+      error instanceof errors.JWTExpired ||
+      error instanceof errors.JWTInvalid ||
+      error instanceof errors.JWSInvalid ||
+      error instanceof errors.JWSSignatureVerificationFailed ||
+      error instanceof errors.JWKSNoMatchingKey
     ) {
       return Response.json({ error: 'Your sign-in session is invalid or expired.' }, { status: 401 });
     }
